@@ -13,7 +13,6 @@ namespace Test
         static void Main(string[] args)
         {
 
-            /*******************************************************Objet métier *********************************************/
             //création d'une base "comptabilité"
             /**  Objets100cLib.BSCPTAApplication100c e = new Objets100cLib.BSCPTAApplication100c();
               try{
@@ -25,33 +24,87 @@ namespace Test
               }
               Console.ReadLine(); **/
 
-              //ouverture d'une base 
-              /**A la place de la propriété Name, il est également possible d’utiliser les propriétés CompanyServer
-                  et CompanyDatabaseName pour affecter respectivement le serveur/instance SQL et la base de 
-                  données SQL**/
-            Objets100cLib.BSCPTAApplication100c bdCompta = new Objets100cLib.BSCPTAApplication100c();
-            Objets100cLib.BSCIALApplication100c bdCommercial = new Objets100cLib.BSCIALApplication100c();
-            bdCompta.Name = @"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae";
-            
-            try {
-                bdCompta.Loggable.UserName = "<Administrateur>";
-                bdCompta.Loggable.UserPwd = "AR2003";
-                bdCompta.Open();
-                Console.WriteLine("Succes");
-               
-               
-            }catch(Exception e){
-                Console.WriteLine(e);
+            /*******************************************************Objet métier: ouverture d'une bdd  **********************************/
+            //base comptable 
+            Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
+            //base commerciale
+            Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
+
+            //Paramètres pour se connecter aux bases
+            ParamDb paramBaseCompta = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae", "<Administrateur>", "AR2003");
+            ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
+
+            //ouverture des bases de données
+            if (OpenDbCommercial(dbCommerce, paramBaseCial) && OpenDbComptable(dbCompta, paramBaseCompta)){
+                Console.WriteLine("succes connection");
+                Console.ReadLine();
             }
-            
-            Console.ReadLine();
 
             //ajouter un enregistrement dans la base
-            Objets100cLib.IPMDocument processDoc = bdCommercial.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteLivraison);
-            Objets100cLib.IBODocument3 doc = (Objets100cLib.IBODocument3) processDoc.Document;
-        }    
-        
-            
+            //Objets100cLib.IPMDocument processDoc = bdCommercial.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteLivraison);
+            //Objets100cLib.IBODocument3 doc = (Objets100cLib.IBODocument3) processDoc.Document;
 
-}
+            /*********************************************************Méthodes***********************************************************/
+            bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
+            {
+                try
+                {
+                    //ouverture de la base comptable 
+                    dbComptable.Name = paramCpta.getDbname();
+                    dbComptable.Loggable.UserName = paramCpta.getuser();
+                    dbComptable.Loggable.UserPwd = paramCpta.getpwd();
+
+                    dbComptable.Open();
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("erreur pour l'ouverture de la base comptable: " + e);
+                    return false;
+                }
+            }
+
+             bool OpenDbCommercial(Objets100cLib.BSCIALApplication100c dbCommercial, ParamDb paramCial)
+            {
+                try
+                {
+                    //ouverture de la base comptable 
+                    dbCommercial.Name = paramCial.getDbname();
+                    dbCommercial.Loggable.UserName = paramCial.getuser();
+                    dbCommercial.Loggable.UserPwd = paramCial.getpwd();
+
+                    dbCommercial.Open();
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("erreur pour l'ouverture de la base commerciale: " + e);
+                    return false;
+                }
+            }
+        }
+
+    }
+
+    
+    public class ParamDb
+    {
+        private String dbName, user, pwd;
+
+        public ParamDb(String dbName, String user, String pwd)
+        {
+            this.dbName = dbName;
+            this.user = user;
+            this.pwd = pwd;
+        }
+
+        public String getDbname()
+        { return this.dbName; }
+
+        public String getuser()
+        { return this.user; }
+
+        public String getpwd()
+        { return this.pwd; }
+    }
 }
