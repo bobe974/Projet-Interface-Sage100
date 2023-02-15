@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Test
 
 {
-    class Program
+    class Program 
     {
         static void Main(string[] args)
         {
@@ -36,9 +36,19 @@ namespace Test
 
             //ouverture des bases de données
             if (OpenDbCommercial(dbCommerce, paramBaseCial) && OpenDbComptable(dbCompta, paramBaseCompta)){
-                Console.WriteLine("succes connection");
+
+                //création d'un client
+                Objets100cLib.IBOClient3 client = null;
+                client = CreateClient(dbCompta, client);
+               // Console.WriteLine("lecture d'un client...");
+               
+            //     client.FactoryClient.ReadNumero("011010003");
                 Console.ReadLine();
+                Console.WriteLine("afficher des données de la base StockServices...");
+                Readdata(dbCommerce);
             }
+
+
 
             //ajouter un enregistrement dans la base
             //Objets100cLib.IPMDocument processDoc = bdCommercial.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteLivraison);
@@ -53,8 +63,9 @@ namespace Test
                     dbComptable.Name = paramCpta.getDbname();
                     dbComptable.Loggable.UserName = paramCpta.getuser();
                     dbComptable.Loggable.UserPwd = paramCpta.getpwd();
-
+                   
                     dbComptable.Open();
+                    Console.WriteLine("succes connexion à " + paramCpta.getDbname());
                     return true;
                 }
                 catch (Exception e)
@@ -74,6 +85,7 @@ namespace Test
                     dbCommercial.Loggable.UserPwd = paramCial.getpwd();
 
                     dbCommercial.Open();
+                    Console.WriteLine("succes connexion à " + paramCial.getDbname());
                     return true;
                 }
                 catch (Exception e)
@@ -82,11 +94,55 @@ namespace Test
                     return false;
                 }
             }
-        }
 
+             Objets100cLib.IBOClient3 CreateClient(Objets100cLib.BSCPTAApplication100c bdComptable, Objets100cLib.IBOClient3 objClient)
+            {
+                try
+                {
+                    //objClient = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
+                    Objets100cLib.IBOClient3 client = null;
+                    client = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
+                    try
+                    {
+                        //client.SetDefault();
+                        //client.CT_Num = "TEST2";
+                        //client.CT_Intitule = "youpi";
+                        //client.Write();
+                        //Console.WriteLine("client créer!");
+                        return client;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                        return null;
+                    }
+                    //Objets100cLib.IBODocumentLigneAllFactory docligne = (Objets100cLib.IBODocumentLigneAllFactory)dbCommerce.FactoryDocumentLigne.Create();
+                    //Objets100cLib.IBODocumentVenteFactory3 doc  = (Objets100cLib.IBODocumentVenteFactory3)dbCommerce.FactoryDocumentVente.Create();
+                 
+                    //création de l'entete
+                    //Objets100cLib.IBODocumentVente3 docEntete = null;
+                    //docEntete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);                     
+                }
+                catch(Exception e){
+                    Console.WriteLine(e);
+                    return null;
+                }    
+            }
+
+            void Readdata(Objets100cLib.BSCIALApplication100c dbcommerce)
+            {
+                /*******************test affichage enregistrement d'article ******************************/
+                String article = dbcommerce.FactoryArticle.ReadReference("08G1DANA").AR_CodeBarre;
+                Console.WriteLine("article: " + article);
+                Console.WriteLine("article: " + dbcommerce.FactoryArticle.ReadCodeBarre("0000030043992").AR_DateCreation);
+                Console.ReadLine();
+                dbcommerce.FactoryDocumentLigne.ReadLigne(734124);
+                /*******************************************************************************************/
+            }
+        }
     }
 
-    
+
     public class ParamDb
     {
         private String dbName, user, pwd;
@@ -107,4 +163,5 @@ namespace Test
         public String getpwd()
         { return this.pwd; }
     }
+
 }
