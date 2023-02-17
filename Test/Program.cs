@@ -13,17 +13,6 @@ namespace Test
         static void Main(string[] args)
         {
 
-            //création d'une base "comptabilité"
-            /**  Objets100cLib.BSCPTAApplication100c e = new Objets100cLib.BSCPTAApplication100c();
-              try{
-                  e.Name = @"C:\test\test1.mae";
-                  e.Create();
-                  Console.WriteLine("base créer");
-              }catch(Exception err){
-                  Console.WriteLine("erreur:"+ err);
-              }
-              Console.ReadLine(); **/
-
             /*******************************************************Objet métier: ouverture d'une bdd  **********************************/
             //base comptable 
             Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
@@ -40,19 +29,12 @@ namespace Test
                 //création d'un client
                 Objets100cLib.IBOClient3 client = null;
                 client = CreateClient(dbCompta, client);
-               // Console.WriteLine("lecture d'un client...");
                
-            //     client.FactoryClient.ReadNumero("011010003");
+                //client.FactoryClient.ReadNumero("011010003");
                 Console.ReadLine();
                 Console.WriteLine("afficher des données de la base StockServices...");
                 Readdata(dbCommerce);
             }
-
-
-
-            //ajouter un enregistrement dans la base
-            //Objets100cLib.IPMDocument processDoc = bdCommercial.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteLivraison);
-            //Objets100cLib.IBODocument3 doc = (Objets100cLib.IBODocument3) processDoc.Document;
 
             /*********************************************************Méthodes***********************************************************/
             bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
@@ -104,11 +86,16 @@ namespace Test
                     client = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
                     try
                     {
+                        // Insertion d'un client
                         //client.SetDefault();
                         //client.CT_Num = "TEST2";
-                        //client.CT_Intitule = "youpi";
+                        //client.CT_Intitule = "test";
                         //client.Write();
-                        //Console.WriteLine("client créer!");
+                        //Console.WriteLine("client crée!");
+                        Objets100cLib.IBODocument3 doc = null;
+                        Objets100cLib.IBODocumentAchatLigne3 doc1 = null;
+                     
+
                         return client;
                     }
                     catch (Exception e)
@@ -132,6 +119,24 @@ namespace Test
             void Readdata(Objets100cLib.BSCIALApplication100c dbcommerce)
             {
                 /*******************test affichage enregistrement d'article ******************************/
+                Objets100cLib.IBICollection collection = null;
+                //Objets100cLib.IBOArticle3 article = null;
+                collection = dbcommerce.FactoryArticle.List;
+                //collection = dbCommerce.FactoryDocumentLigne.List;
+               
+                Console.WriteLine("nombre d'objet dans la collection:" + collection.Count);
+                foreach(Objets100cLib.IBOArticle3 unArticle in collection )
+                //foreach (Objets100cLib.IBODocumentLigne3 unArticle in collection)
+                {
+                    Console.WriteLine(unArticle.AR_CodeBarre);
+                    Console.WriteLine(unArticle.AR_Design);
+                   
+                    //Console.WriteLine(unArticle.DateCreation);
+                    //Console.WriteLine(unArticle.Collaborateur);
+                    
+                }
+
+
                 String article = dbcommerce.FactoryArticle.ReadReference("08G1DANA").AR_CodeBarre;
                 Console.WriteLine("article: " + article);
                 Console.WriteLine("article: " + dbcommerce.FactoryArticle.ReadCodeBarre("0000030043992").AR_DateCreation);
