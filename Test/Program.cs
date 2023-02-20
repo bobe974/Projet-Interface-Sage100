@@ -24,16 +24,21 @@ namespace Test
             ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
 
             //ouverture des bases de données
-            if (OpenDbCommercial(dbCommerce, paramBaseCial) && OpenDbComptable(dbCompta, paramBaseCompta)){
+            if(OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta))){
 
                 //création d'un client
-                Objets100cLib.IBOClient3 client = null;
-                client = CreateClient(dbCompta, client);
+                //Objets100cLib.IBOClient3 client = null;
+                //client = CreateClient(dbCompta, client);
                
-                //client.FactoryClient.ReadNumero("011010003");
+              
                 Console.ReadLine();
-                Console.WriteLine("afficher des données de la base StockServices...");
-                Readdata(dbCommerce);
+                //Console.WriteLine("afficher des données de la base StockServices...");
+                //Readdata(dbCommerce);
+                Console.WriteLine("création d'un bon de commande...");
+                Createcmd();
+                //Console.WriteLine(dbCompta.FactoryClient.ReadNumero("212060031")); 
+                
+                Console.ReadLine();
             }
 
             /*********************************************************Méthodes***********************************************************/
@@ -57,7 +62,7 @@ namespace Test
                 }
             }
 
-             bool OpenDbCommercial(Objets100cLib.BSCIALApplication100c dbCommercial, ParamDb paramCial)
+             bool OpenDbCommercial(Objets100cLib.BSCIALApplication100c dbCommercial, ParamDb paramCial, Objets100cLib.BSCPTAApplication100c bdcompta)
             {
                 try
                 {
@@ -65,7 +70,8 @@ namespace Test
                     dbCommercial.Name = paramCial.getDbname();
                     dbCommercial.Loggable.UserName = paramCial.getuser();
                     dbCommercial.Loggable.UserPwd = paramCial.getpwd();
-
+                    dbCommercial.CptaApplication = bdcompta;
+                 
                     dbCommercial.Open();
                     Console.WriteLine("succes connexion à " + paramCial.getDbname());
                     return true;
@@ -77,6 +83,37 @@ namespace Test
                 }
             }
 
+             void Createcmd()
+            {
+               
+                //entete du bon de commande
+                Objets100cLib.IBODocumentVente3 entete = null;
+                Objets100cLib.IBODocumentVenteLigne3 lignes = null;
+
+                try
+                {
+                   // entete = (Objets100cLib.IBODocumentVente3)dbCommerce.FactoryDocumentVente.Create();
+                    entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
+                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero("TEST2"));
+                    entete.DO_Date = DateTime.Now;
+                    entete.SetDefaultDO_Piece();
+                       
+                    entete.Write();
+                    Console.WriteLine("entete du document crée!");
+
+                    //ajout des lignes dans le document 
+                    lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
+                    
+                    //attribution d'un article
+                    lignes.SetDefaultArticle(dbCommerce.FactoryArticle.ReadReference("08G1DANA"), 1);
+                    lignes.Write();
+                    Console.WriteLine("article ajouté");
+                }
+                catch(Exception e) {
+
+                    Console.WriteLine(e);
+                }
+            }
              Objets100cLib.IBOClient3 CreateClient(Objets100cLib.BSCPTAApplication100c bdComptable, Objets100cLib.IBOClient3 objClient)
             {
                 try
@@ -84,6 +121,7 @@ namespace Test
                     //objClient = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
                     Objets100cLib.IBOClient3 client = null;
                     client = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
+                  
                     try
                     {
                         // Insertion d'un client
@@ -92,8 +130,8 @@ namespace Test
                         //client.CT_Intitule = "test";
                         //client.Write();
                         //Console.WriteLine("client crée!");
-                        Objets100cLib.IBODocument3 doc = null;
-                        Objets100cLib.IBODocumentAchatLigne3 doc1 = null;
+                      
+                       
                      
 
                         return client;
