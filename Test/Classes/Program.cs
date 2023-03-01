@@ -2,6 +2,8 @@
 using Newtonsoft.Json;
 using System.IO;
 using Test.Classes;
+using System.Collections.Generic;
+using System.Globalization;
 
 namespace Test
 
@@ -11,23 +13,33 @@ namespace Test
 
         static void Main(string[] args)
         {
-
             /*******************************************Connexion et récupération des json par FTP  ****************************/
-            // TODO
-
+            // TODO: 2 solution: 1-> télécharger les fichiers json ou les lire directement sur le serveur, vérifier les données et insertion
 
             /******************************************************* Lecture du fichier json  **********************************/
             //chemin du fichier json
             string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80881.json";
             // génère un objet JsonModel depuis le fichier json
-             JsonModel jsonObj =  DeserialiseJson(jsonPath);
-             Console.WriteLine(jsonObj.lignes[0].codeArticle);
-             Console.WriteLine(jsonObj.lignes[1].codeArticle);
-       
+            JsonModel jsonObj =  DeserialiseJson(jsonPath);
+
+            Console.WriteLine(jsonObj.lignes[0].codeArticle);
+            Console.WriteLine(jsonObj.lignes[1].codeArticle);
             Console.ReadLine();
 
-            
-              
+            // test d'affichage des lignes
+            Console.WriteLine("test d'affichage des lignes du json");
+            IList <Lignes> lesLignes = jsonObj.lignes;
+            Console.WriteLine("nb de lignes:" + lesLignes.Count);
+            foreach (Lignes l in lesLignes)
+            {
+                Console.WriteLine("num ligne:"+ l.numLigne);
+                Console.WriteLine("id:"+l.idligne);
+                Console.WriteLine("identete:"+ l.identete);
+                Console.WriteLine("code article: "+l.codeArticle);
+            }
+
+            Console.ReadLine();
+
             /*******************************************************Objet métier: ouverture d'une bdd  **********************************/
             //base comptable 
             Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
@@ -40,7 +52,8 @@ namespace Test
             ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
 
             //ouverture des bases de données
-            if(OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta))){
+            Console.WriteLine("tentative de connexion a la base SAGE...");
+            if (OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta))){
 
                 //création d'un client
                 //Objets100cLib.IBOClient3 client = null;
@@ -49,14 +62,12 @@ namespace Test
                 Console.ReadLine();
                 //Console.WriteLine("afficher des données de la base StockServices...");
                 //Readdata(dbCommerce);
-                Console.WriteLine("création d'un bon de commande...");
-                Createcmd();
+                Createcmd(jsonObj);
                 Console.ReadLine();
                 //Console.WriteLine(dbCompta.FactoryClient.ReadNumero("212060031")); 
             }
 
             /****************************************************Insertion avec objets métiers*******************************************/
-
 
             /*********************************************************Méthodes***********************************************************/
             bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
@@ -100,34 +111,37 @@ namespace Test
                 }
             }
 
-             void Createcmd()
+             void Createcmd(JsonModel jsonObject)
             {
-               
                 //entete du bon de commande
+                Console.WriteLine("Création d'un bon de commande...");
                 Objets100cLib.IBODocumentVente3 entete = null;
                 Objets100cLib.IBODocumentVenteLigne3 lignes = null;
                 Objets100cLib.IBODocument3 info = null;
 
                 try
                 {
-                   // entete = (Objets100cLib.IBODocumentVente3)dbCommerce.FactoryDocumentVente.Create();
+                    // entete = (Objets100cLib.IBODocumentVente3)dbCommerce.FactoryDocumentVente.Create();
                     entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-
-                     entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero("TEST2"));
-                    //entete.Client.CT_Num = "TEST2";
-                    entete.DO_Date = DateTime.Now;
+                    
+                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
                     //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
                     entete.SetDefaultDO_Piece();
+                    //entete.Client.CT_Num = "TEST2";
+                    entete.DO_Date = StringToDate(jsonObject.dateCommande); // méthode de conversion
+                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison);
                    
-                    // lister les info libres des tiers
-                    foreach (Objets100cLib.IBIField field in dbCompta.FactoryTiers.InfoLibreFields)
-                    {
-                        Console.WriteLine("Intitulé : " + field.Name);
-                        
-                    }
 
+                    //entete.DO_TotalHT = jsonObject.totalHT;
+                    // entete.DO_TotalTTC = jsonObject.totalTTC;
                     entete.Write();
+
                     Console.WriteLine("entete du document crée!");
+                    /// lister les info libres des tiers
+                    //foreach (Objets100cLib.IBIField field in dbCompta.FactoryTiers.InfoLibreFields)
+                    //{
+                    //    Console.WriteLine("Intitulé : " + field.Name);             
+                    //}
 
                     //ajout des lignes dans le document 
                     lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
@@ -135,16 +149,15 @@ namespace Test
                     //attribution d'un article
                     lignes.SetDefaultArticle(dbCommerce.FactoryArticle.ReadReference("08G1DANA"), 1);
                     //lignes.Article.AR_Ref = "08G1DANA";
-
-
+                    
                     lignes.Write();
                     Console.WriteLine("article ajouté");
                 }
                 catch(Exception e) {
-
                     Console.WriteLine(e);
                 }
             }
+
              Objets100cLib.IBOClient3 CreateClient(Objets100cLib.BSCPTAApplication100c bdComptable, Objets100cLib.IBOClient3 objClient)
             {
                 try
@@ -160,8 +173,7 @@ namespace Test
                         //client.CT_Num = "TEST2";
                         //client.CT_Intitule = "test";
                         //client.Write();
-                        //Console.WriteLine("client crée!");
-                        
+                        //Console.WriteLine("client crée!");           
                         return client;
                     }
                     catch (Exception e)
@@ -198,8 +210,7 @@ namespace Test
                     Console.WriteLine(unArticle.AR_Design);
                    
                     //Console.WriteLine(unArticle.DateCreation);
-                    //Console.WriteLine(unArticle.Collaborateur);
-                    
+                    //Console.WriteLine(unArticle.Collaborateur); 
                 }
 
                 String article = dbcommerce.FactoryArticle.ReadReference("08G1DANA").AR_CodeBarre;
@@ -207,7 +218,6 @@ namespace Test
                 Console.WriteLine("article: " + dbcommerce.FactoryArticle.ReadCodeBarre("0000030043992").AR_DateCreation);
                 Console.ReadLine();
                 dbcommerce.FactoryDocumentLigne.ReadLigne(734124);
-                /*******************************************************************************************/
             }
 
             JsonModel DeserialiseJson(string path)
@@ -226,7 +236,19 @@ namespace Test
                     return null;
                 }
             }
+
+            DateTime StringToDate(string dateString)
+            {
+                DateTime date;
+                if (DateTime.TryParseExact(dateString, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+                {
+                    return date;
+                }
+                else
+                {                 
+                    throw new ArgumentException("La chaîne fournie n'est pas au format attendu", nameof(dateString));
+                }
+            }
         }
     }
-
 }
