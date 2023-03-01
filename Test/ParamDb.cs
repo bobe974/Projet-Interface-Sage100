@@ -1,24 +1,22 @@
-﻿using System;
-
-
-public class ParamDb
+﻿public class ParamDb
 {
-	private String dbName, user, pwd;
+    private String dbName, user, pwd;
 
-	public ParamDb(String dbName, String user, String pwd)
-	{
-		this.dbName = dbName;
-		this.user = user;
-		this.pwd = pwd;
-	}
+    public ParamDb(String dbName, String user, String pwd)
+    {
+        this.dbName = dbName;
+        this.user = user;
+        this.pwd = pwd;
+    }
 
-	public String getDbname()
-    {	return this.dbName; }
+    public String getDbname()
+    { return this.dbName; }
 
-	public String getuser()
-	{ return this.user; }
+    public String getuser()
+    { return this.user; }
 
-	public String getpwd()
-	{ return thispwd; }
+    public String getpwd()
+    { return this.pwd; }
 }
 
+}

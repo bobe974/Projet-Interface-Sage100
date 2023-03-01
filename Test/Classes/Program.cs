@@ -1,18 +1,33 @@
 ﻿using System;
-using System.Data.Odbc;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Newtonsoft.Json;
+using System.IO;
+using Test.Classes;
 
 namespace Test
 
 {
     class Program 
     {
+
         static void Main(string[] args)
         {
 
+            /*******************************************Connexion et récupération des json par FTP  ****************************/
+            // TODO
+
+
+            /******************************************************* Lecture du fichier json  **********************************/
+            //chemin du fichier json
+            string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80881.json";
+            // génère un objet JsonModel depuis le fichier json
+             JsonModel jsonObj =  DeserialiseJson(jsonPath);
+             Console.WriteLine(jsonObj.lignes[0].codeArticle);
+             Console.WriteLine(jsonObj.lignes[1].codeArticle);
+       
+            Console.ReadLine();
+
+            
+              
             /*******************************************************Objet métier: ouverture d'une bdd  **********************************/
             //base comptable 
             Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
@@ -20,6 +35,7 @@ namespace Test
             Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
 
             //Paramètres pour se connecter aux bases
+            
             ParamDb paramBaseCompta = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae", "<Administrateur>", "AR2003");
             ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
 
@@ -30,16 +46,17 @@ namespace Test
                 //Objets100cLib.IBOClient3 client = null;
                 //client = CreateClient(dbCompta, client);
                
-              
                 Console.ReadLine();
                 //Console.WriteLine("afficher des données de la base StockServices...");
                 //Readdata(dbCommerce);
                 Console.WriteLine("création d'un bon de commande...");
                 Createcmd();
-                //Console.WriteLine(dbCompta.FactoryClient.ReadNumero("212060031")); 
-                
                 Console.ReadLine();
+                //Console.WriteLine(dbCompta.FactoryClient.ReadNumero("212060031")); 
             }
+
+            /****************************************************Insertion avec objets métiers*******************************************/
+
 
             /*********************************************************Méthodes***********************************************************/
             bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
@@ -89,15 +106,26 @@ namespace Test
                 //entete du bon de commande
                 Objets100cLib.IBODocumentVente3 entete = null;
                 Objets100cLib.IBODocumentVenteLigne3 lignes = null;
+                Objets100cLib.IBODocument3 info = null;
 
                 try
                 {
                    // entete = (Objets100cLib.IBODocumentVente3)dbCommerce.FactoryDocumentVente.Create();
                     entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero("TEST2"));
+
+                     entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero("TEST2"));
+                    //entete.Client.CT_Num = "TEST2";
                     entete.DO_Date = DateTime.Now;
+                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
                     entete.SetDefaultDO_Piece();
-                       
+                   
+                    // lister les info libres des tiers
+                    foreach (Objets100cLib.IBIField field in dbCompta.FactoryTiers.InfoLibreFields)
+                    {
+                        Console.WriteLine("Intitulé : " + field.Name);
+                        
+                    }
+
                     entete.Write();
                     Console.WriteLine("entete du document crée!");
 
@@ -106,6 +134,9 @@ namespace Test
                     
                     //attribution d'un article
                     lignes.SetDefaultArticle(dbCommerce.FactoryArticle.ReadReference("08G1DANA"), 1);
+                    //lignes.Article.AR_Ref = "08G1DANA";
+
+
                     lignes.Write();
                     Console.WriteLine("article ajouté");
                 }
@@ -121,7 +152,7 @@ namespace Test
                     //objClient = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
                     Objets100cLib.IBOClient3 client = null;
                     client = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
-                  
+                    
                     try
                     {
                         // Insertion d'un client
@@ -130,10 +161,7 @@ namespace Test
                         //client.CT_Intitule = "test";
                         //client.Write();
                         //Console.WriteLine("client crée!");
-                      
-                       
-                     
-
+                        
                         return client;
                     }
                     catch (Exception e)
@@ -174,7 +202,6 @@ namespace Test
                     
                 }
 
-
                 String article = dbcommerce.FactoryArticle.ReadReference("08G1DANA").AR_CodeBarre;
                 Console.WriteLine("article: " + article);
                 Console.WriteLine("article: " + dbcommerce.FactoryArticle.ReadCodeBarre("0000030043992").AR_DateCreation);
@@ -182,29 +209,24 @@ namespace Test
                 dbcommerce.FactoryDocumentLigne.ReadLigne(734124);
                 /*******************************************************************************************/
             }
+
+            JsonModel DeserialiseJson(string path)
+            {
+                try
+                {
+                    Console.WriteLine("Lecture du fichier Json:" + path);
+                    string json = File.ReadAllText(path);
+                    //conversion du json en Objet c#
+                    JsonModel obj = JsonConvert.DeserializeObject<JsonModel>(json);                  
+                    return obj;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    return null;
+                }
+            }
         }
-    }
-
-
-    public class ParamDb
-    {
-        private String dbName, user, pwd;
-
-        public ParamDb(String dbName, String user, String pwd)
-        {
-            this.dbName = dbName;
-            this.user = user;
-            this.pwd = pwd;
-        }
-
-        public String getDbname()
-        { return this.dbName; }
-
-        public String getuser()
-        { return this.user; }
-
-        public String getpwd()
-        { return this.pwd; }
     }
 
 }
