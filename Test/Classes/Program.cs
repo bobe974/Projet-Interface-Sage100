@@ -129,9 +129,7 @@ namespace Test
                     entete.SetDefaultDO_Piece();
                     //entete.Client.CT_Num = "TEST2";
                     entete.DO_Date = StringToDate(jsonObject.dateCommande); // méthode de conversion
-                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison);
-                   
-
+                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison);                 
                     //entete.DO_TotalHT = jsonObject.totalHT;
                     // entete.DO_TotalTTC = jsonObject.totalTTC;
                     entete.Write();
@@ -140,59 +138,30 @@ namespace Test
                     /// lister les info libres des tiers
                     //foreach (Objets100cLib.IBIField field in dbCompta.FactoryTiers.InfoLibreFields)
                     //{
-                    //    Console.WriteLine("Intitulé : " + field.Name);             
+                    //   Console.WriteLine("Intitulé : " + field.Name);             
                     //}
-
+                    
                     //ajout des lignes dans le document 
-                    lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
                     
-                    //attribution d'un article
-                    lignes.SetDefaultArticle(dbCommerce.FactoryArticle.ReadReference("08G1DANA"), 1);
+                    //parcours de la collection de ligne du document json
+                    Console.WriteLine("nb de lignes:" + lesLignes.Count);       
+                    foreach (Lignes l in jsonObj.lignes)
+                    {
+                        //ajout d'un article dans le document
+                        lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
+                        Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
+                        lignes.SetDefaultArticle(dbCommerce.FactoryArticle.ReadReference(l.codeArticle), l.quantiteUc);
+                        lignes.Write();
+                    }
                     //lignes.Article.AR_Ref = "08G1DANA";
-                    
                     lignes.Write();
-                    Console.WriteLine("article ajouté");
+                    Console.WriteLine("articles ajoutés");
                 }
                 catch(Exception e) {
                     Console.WriteLine(e);
                 }
             }
 
-             Objets100cLib.IBOClient3 CreateClient(Objets100cLib.BSCPTAApplication100c bdComptable, Objets100cLib.IBOClient3 objClient)
-            {
-                try
-                {
-                    //objClient = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
-                    Objets100cLib.IBOClient3 client = null;
-                    client = (Objets100cLib.IBOClient3)bdComptable.FactoryClient.Create();
-                    
-                    try
-                    {
-                        // Insertion d'un client
-                        //client.SetDefault();
-                        //client.CT_Num = "TEST2";
-                        //client.CT_Intitule = "test";
-                        //client.Write();
-                        //Console.WriteLine("client crée!");           
-                        return client;
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-                        return null;
-                    }
-                    //Objets100cLib.IBODocumentLigneAllFactory docligne = (Objets100cLib.IBODocumentLigneAllFactory)dbCommerce.FactoryDocumentLigne.Create();
-                    //Objets100cLib.IBODocumentVenteFactory3 doc  = (Objets100cLib.IBODocumentVenteFactory3)dbCommerce.FactoryDocumentVente.Create();
-                 
-                    //création de l'entete
-                    //Objets100cLib.IBODocumentVente3 docEntete = null;
-                    //docEntete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);                     
-                }
-                catch(Exception e){
-                    Console.WriteLine(e);
-                    return null;
-                }    
-            }
 
             void Readdata(Objets100cLib.BSCIALApplication100c dbcommerce)
             {
