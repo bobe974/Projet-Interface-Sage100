@@ -18,6 +18,7 @@ namespace Test
 
             // TODO: 2 solution: 1-> télécharger les fichiers json ou les lire directement sur le serveur, vérifier les données et insertion
 
+
             /******************************************************* Lecture du fichier json  **********************************/
             //chemin du fichier json
             string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80881.json";
@@ -63,6 +64,7 @@ namespace Test
 
                 Console.ReadLine();
                 Createcmd(jsonObj);
+                //Createprocesscmd(jsonObj);
             }
 
             CloseDB(dbCommerce, dbCompta);
@@ -145,11 +147,15 @@ namespace Test
                     entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
 
                     entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
-                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
-                    entete.SetDefaultDO_Piece();
+
                     //entete.Client.CT_Num = "TEST2";
                     entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
                     entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
+                    Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                    //attibuer la souche de type PDA
+                    entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
+                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
+                    entete.SetDefaultDO_Piece();
 
                     //entete.DO_Ref = "UUUU";
                     //entete.DO_TotalHT = jsonObject.totalHT;
@@ -158,6 +164,7 @@ namespace Test
                     Console.WriteLine("entete du document crée!");
 
                     // lister les info libres
+                    
                     Console.WriteLine("liste des champs infos libres");
                     foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
                     {
@@ -177,11 +184,11 @@ namespace Test
                         Objets100cLib.IBOArticle3 article = dbCommerce.FactoryArticle.ReadReference(l.codeArticle);
 
                         Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
-                        lignes.SetDefaultArticle(article, l.quantiteUc);
+                        lignes.SetDefaultArticle(article, l.quantiteUc);              
                         lignes.Write();
                     }
                     //lignes.Article.AR_Ref = "08G1DANA";
-                    lignes.Write();
+                   // lignes.Write();
                     Console.WriteLine("articles ajoutés");
                 }
                 catch (Exception e)
@@ -190,6 +197,64 @@ namespace Test
                 }
             }
 
+            void Createprocesscmd(JsonModel jsonObject)
+            {
+                //entete du bon de commande
+                Console.WriteLine("Création d'un bon de commande...");
+                Objets100cLib.IBODocumentVente3 entete = null;
+
+                try
+                {
+                    
+                    entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
+                    Objets100cLib.IPMDocument mProcessDoc = (Objets100cLib.IPMDocument)dbCommerce.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
+                    entete = (Objets100cLib.IBODocumentVente3)mProcessDoc.Document;
+                   
+                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
+
+                    entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
+                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
+                    Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                    //attibuer la souche de type PDA
+                    entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
+                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
+                    entete.SetDefaultDO_Piece();
+                   
+                    Console.WriteLine("entete du document crée!");
+
+                    // lister les info libres
+
+                    Console.WriteLine("liste des champs infos libres");
+                    foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
+                    {
+                        Console.WriteLine("Intitulé : " + field.Name);
+                    }
+                    //insertion infos libres
+                    entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
+                 
+
+                    //ajout des lignes dans le document 
+                    //parcours de la collection de ligne du document json
+                    Console.WriteLine("nb de lignes:" + lesLignes.Count);
+                    foreach (Lignes l in jsonObj.lignes)
+                    {
+                        //ajout d'un article dans le document
+                       
+                        mProcessDoc.AddArticle(dbCommerce.FactoryArticle.ReadReference(l.codeArticle), l.quantiteUc);
+                        Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
+                        
+                    }
+                    //lignes.Article.AR_Ref = "08G1DANA";
+                    // lignes.Write();
+                    mProcessDoc.Process();
+                    Console.WriteLine("articles ajoutés");
+
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+            }
             void Readdata(Objets100cLib.BSCIALApplication100c dbcommerce)
             {
                 /*******************test affichage enregistrement d'article ******************************/
@@ -252,36 +317,59 @@ namespace Test
                 }
             }
 
+            
+            /**
+             * Etabli un connexion FTP  puis télécharge plusieurs fichiers suivant la liste donnée en paramètre (
+             */
+            void DownloadMultipleFilesFromFtp(String user, String pwd, String url, List<string> listFilesPath, string localFolderPath)
+            {
+                //établir une connexion FTP permanente
+                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
+                request.Credentials = new NetworkCredential(user, pwd);
+                FtpWebResponse response = (FtpWebResponse)request.GetResponse();
+                Stream responseStream = response.GetResponseStream();
+
+                //parcourir la liste des fichiers à télécharger
+                foreach (string remoteFilePath in listFilesPath)
+                {
+                    //construire l'URL complète du fichier distant
+                    string fileUrl = Path.Combine(url, remoteFilePath);
+
+                    //créer le chemin complet du fichier local
+                    string destPath = Path.Combine(localFolderPath, Path.GetFileName(remoteFilePath));
+
+                    //télécharger le fichier distant
+                    DownloadFileFromFtp(request, responseStream, fileUrl, destPath);
+                }
+
+                //fermer la connexion FTP
+                response.Close();
+            }
+
             /**
              * Se connecte à un serveur par protocole FTP et télécharge le fichiers lié à l'url
              */
-            void DownloadToFtpServer(String user, String pwd, String url, String destPath)
+            void DownloadFileFromFtp(FtpWebRequest request, Stream responseStream, string fileUrl, string destPath)
             {
-                //objet pour se connecter au serveur
-                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
-                request.Method = WebRequestMethods.Ftp.DownloadFile;
-                //connexion
-                request.Credentials = new NetworkCredential(user, pwd);
-                using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
-                {
-                    using (Stream responseStream = response.GetResponseStream())
-                    {
-                        using (StreamReader reader = new StreamReader(responseStream))
-                        {
-                            //lecture du fichier téléchargé
-                            string content = reader.ReadToEnd();
+                //créer une nouvelle requête pour télécharger le fichier spécifié
+                FtpWebRequest downloadRequest = (FtpWebRequest)WebRequest.Create(fileUrl);
+                downloadRequest.Method = WebRequestMethods.Ftp.DownloadFile;
+                downloadRequest.Credentials = request.Credentials; // réattribue les paramatres de connexion
 
-                            //écrit le fichier à un emplacement spécifique
-                            using (StreamWriter writer = new StreamWriter(destPath))
-                            {
-                                writer.Write(content);
-                            }
+                //télécharger le fichier et l'écrire dans le fichier local
+                using (FtpWebResponse response = (FtpWebResponse)downloadRequest.GetResponse())
+                {
+                    using (Stream remoteStream = response.GetResponseStream())
+                    {
+                        using (FileStream localStream = new FileStream(destPath, FileMode.Create))
+                        {
+                            remoteStream.CopyTo(localStream);
                         }
                     }
-                    Console.WriteLine($"téléchargement complet, statut {response.StatusDescription}");
-                }              
+                }
+                Console.WriteLine($"Téléchargement de {fileUrl} terminé.");
             }
-        }
 
+        }
     }
 }

@@ -71,6 +71,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\FtpSync.cs" />
     <Compile Include="Classes\JsonModel.cs" />
     <Compile Include="Classes\ParamDb.cs" />
     <Compile Include="Classes\Program.cs" />
