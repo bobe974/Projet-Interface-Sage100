@@ -17,9 +17,14 @@ namespace Test
             /*******************************************Connexion et récupération des json par FTP  ****************************/
 
             // TODO: 2 solution: 1-> télécharger les fichiers json ou les lire directement sur le serveur, vérifier les données et insertion
-
+            FTPManager ftp = new FTPManager("etienne", "root", "ftp://127.0.0.1:21");
+            ftp.SyncFilesFromFtp(@"C:\Users\Utilisateur\Desktop\fichierLocal");
+            Console.ReadLine();
 
             /******************************************************* Lecture du fichier json  **********************************/
+            
+            //parcours des fichiers jsons dans le répertoire
+
             //chemin du fichier json
             string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80881.json";
             //string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221014_79394.json";
@@ -316,60 +321,6 @@ namespace Test
                     throw new ArgumentException("La chaîne fournie n'est pas au format attendu", nameof(dateString));
                 }
             }
-
-            
-            /**
-             * Etabli un connexion FTP  puis télécharge plusieurs fichiers suivant la liste donnée en paramètre (
-             */
-            void DownloadMultipleFilesFromFtp(String user, String pwd, String url, List<string> listFilesPath, string localFolderPath)
-            {
-                //établir une connexion FTP permanente
-                FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
-                request.Credentials = new NetworkCredential(user, pwd);
-                FtpWebResponse response = (FtpWebResponse)request.GetResponse();
-                Stream responseStream = response.GetResponseStream();
-
-                //parcourir la liste des fichiers à télécharger
-                foreach (string remoteFilePath in listFilesPath)
-                {
-                    //construire l'URL complète du fichier distant
-                    string fileUrl = Path.Combine(url, remoteFilePath);
-
-                    //créer le chemin complet du fichier local
-                    string destPath = Path.Combine(localFolderPath, Path.GetFileName(remoteFilePath));
-
-                    //télécharger le fichier distant
-                    DownloadFileFromFtp(request, responseStream, fileUrl, destPath);
-                }
-
-                //fermer la connexion FTP
-                response.Close();
-            }
-
-            /**
-             * Se connecte à un serveur par protocole FTP et télécharge le fichiers lié à l'url
-             */
-            void DownloadFileFromFtp(FtpWebRequest request, Stream responseStream, string fileUrl, string destPath)
-            {
-                //créer une nouvelle requête pour télécharger le fichier spécifié
-                FtpWebRequest downloadRequest = (FtpWebRequest)WebRequest.Create(fileUrl);
-                downloadRequest.Method = WebRequestMethods.Ftp.DownloadFile;
-                downloadRequest.Credentials = request.Credentials; // réattribue les paramatres de connexion
-
-                //télécharger le fichier et l'écrire dans le fichier local
-                using (FtpWebResponse response = (FtpWebResponse)downloadRequest.GetResponse())
-                {
-                    using (Stream remoteStream = response.GetResponseStream())
-                    {
-                        using (FileStream localStream = new FileStream(destPath, FileMode.Create))
-                        {
-                            remoteStream.CopyTo(localStream);
-                        }
-                    }
-                }
-                Console.WriteLine($"Téléchargement de {fileUrl} terminé.");
-            }
-
         }
     }
 }
