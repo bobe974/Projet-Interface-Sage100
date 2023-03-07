@@ -16,50 +16,24 @@ namespace Test
         public const string PWD = "root";
         public const string URL = "ftp://127.0.0.1:21";
         public const string LOCALFILEPATH = @"C:\Users\Utilisateur\Desktop\fichierLocal";
+        //Chemin du fichier pour stocker les noms de fichiers traités
+        public const string processedFilesPath = @"C:\Users\Utilisateur\Desktop\fichierLocal\verif.txt";
+
 
         static void Main(string[] args)
         {
-            /*******************************************Connexion et récupération des json par FTP  ****************************/
-           
+            //Connexion et récupération des json par FTP           
             FTPManager ftp = new FTPManager(USER, PWD, URL);
             ftp.SyncFilesFromFtp(LOCALFILEPATH);
             Console.ReadLine();
 
-         
-            //chemin du fichier json
-            //string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80881.json";
-            //string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221014_79394.json";
-            //string jsonPath = @"C:\Users\Utilisateur\Desktop\Projet 1\fichier json\BiZiiPAD_20221129_80882.json";
-
-            // génère un objet JsonModel depuis le fichier json
-            //JsonModel jsonObj = DeserialiseJson(jsonPath);
-
-            //Console.WriteLine(jsonObj.lignes[0].codeArticle);
-            //Console.WriteLine(jsonObj.lignes[1].codeArticle);
-            Console.ReadLine();
-
-            // test d'affichage des lignes
-            //Console.WriteLine("test d'affichage des lignes du json");
-            //IList<Lignes> lesLignes = jsonObj.lignes;
-            //Console.WriteLine("nb de lignes:" + lesLignes.Count);
-            //foreach (Lignes l in lesLignes)
-            //{
-            //    Console.WriteLine("num ligne:" + l.numLigne);
-            //    Console.WriteLine("id:" + l.idligne);
-            //    Console.WriteLine("identete:" + l.identete);
-            //    Console.WriteLine("code article: " + l.codeArticle);
-            //}
-
-            //Console.ReadLine();
-
-            /*******************************************************Objet métier: ouverture d'une bdd  **********************************/
-            //base comptable 
+            //Objet métier: ouverture des bdd  
+           //base comptable 
             Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
             //base commerciale
             Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
 
             //Paramètres pour se connecter aux bases
-
             ParamDb paramBaseCompta = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae", "<Administrateur>", "AR2003");
             ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
 
@@ -68,30 +42,32 @@ namespace Test
             if (OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta)))
             {
                 Console.ReadLine();
-                //Createcmd(jsonObj);
-                //Createprocesscmd(jsonObj);
+                //Lecture du fichier json 
 
-                /******************************************************* Lecture du fichier json  **********************************/
-
-                //parcours des fichiers jsons dans le répertoire
+                //parcours des fichiers json dans le répertoire
                 List<string> localFiles = Directory.GetFiles(LOCALFILEPATH).ToList();
                 foreach (string s in localFiles)
                 {
-                    Console.WriteLine(s);
-
-                    // génère un objet JsonModel depuis le fichier json
-                    Console.WriteLine("conversion du json en modele c#");
-                    JsonModel jsonModel = DeserialiseJson(s);
-                    Createcmd(jsonModel);
+                    Console.WriteLine(s);   
+                    if (!(IsFileAlreadyProcessed(s))) // vérifie si le fichier a deja été traité
+                    {
+                        // génère un objet JsonModel depuis le fichier json
+                        Console.WriteLine("conversion de "+ s+ " en modele c#");
+                        if (ValidateJson(s))
+                        {
+                            JsonModel jsonModel = DeserialiseJson(s);
+                            //créer le bon de commande 
+                            Createcmd(jsonModel);
+                        }
+                        //ajoute le nom du ficher dans la liste des fichiers traités
+                        AddFileAsProcessed(s);
+                    }     
                 }
             }
-
             Console.ReadLine();
             CloseDB(dbCommerce, dbCompta);
             Console.ReadLine();
-
-            /****************************************************Insertion avec objets métiers*******************************************/
-
+       
             /*********************************************************Méthodes***********************************************************/
             bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
             {
@@ -300,6 +276,42 @@ namespace Test
                 {
                     throw new ArgumentException("La chaîne fournie n'est pas au format attendu", nameof(dateString));
                 }
+            }
+
+           
+            //Vérifie si le fichier a déjà été traité en vérifiant s'il figure dans la liste des fichiers traités
+            bool IsFileAlreadyProcessed(string fileName)
+            {
+                // Vérifier si le fichier a déjà été traité en lisant la liste des fichiers traités
+                string[] processedFiles = File.ReadAllLines(processedFilesPath);
+                Console.WriteLine(processedFiles.Contains(fileName));
+                return processedFiles.Contains(fileName);
+            }
+
+            //Ajoute le nom du fichier à la liste des fichiers traités
+            void AddFileAsProcessed(string fileName)
+            {
+                //Ajouter le nom du fichier à la liste des fichiers traités
+                File.AppendAllText(processedFilesPath, fileName + Environment.NewLine);
+            }
+
+              bool ValidateJson(string filePath)
+              { 
+                string jsonString = File.ReadAllText(filePath);
+
+                try
+                {
+                    Console.WriteLine("vérification de " + filePath);
+                    JsonConvert.DeserializeObject(jsonString);
+                    Console.WriteLine("Le fichier JSON est valide.");
+                    return true;
+                }
+                catch (JsonReaderException ex)
+                {
+                    Console.WriteLine("Le fichier JSON est invalide : " + ex.Message);
+                    return false;
+                }
+
             }
         }
     }

@@ -22,6 +22,8 @@ namespace Test.Classes
             this.url = url;
         }
 
+        //TODO Une instance de ftpRequest pour toutes les opérations
+
         public void OpenFtpConnection()
         {
             try{
@@ -46,7 +48,8 @@ namespace Test.Classes
         }
 
         /**
-         * établie une connexion ftp puis synchonise les fichiers du répertoire local au répertoire distant
+         * Etabli une connexion FTP puis synchonise les fichiers du répertoire local au répertoire distant
+         * Télécharge les fichiers qui n'existe pas en local ou qui ont été mise à jours
          */
         public void SyncFilesFromFtp(string localFolderPath)
         {
@@ -63,10 +66,14 @@ namespace Test.Classes
                 using (StreamReader reader = new StreamReader(response.GetResponseStream()))
                 {
                     string line = reader.ReadLine();
-                    while (!string.IsNullOrEmpty(line))
+                    Console.WriteLine("line:" + line);
+                    while (!string.IsNullOrEmpty(line))  //pas de ficiers vide ou qui ne sont pas des .json
                     {
-                        remoteFiles.Add(line);
-                        line = reader.ReadLine(); //lecture de la ligne suivante
+                        if (!(IsNotJson(line))) // si c'est un json on l'ajoute à la liste des téléchargements
+                        {
+                            remoteFiles.Add(line);   
+                        }
+                      line = reader.ReadLine(); //lecture de la ligne suivante
                     }
                 }
 
@@ -100,45 +107,12 @@ namespace Test.Classes
                         DownloadFileFromFtp(request, remoteFilePath, localFilePath);
                     }
                 }
-
-                //fermer la connexion FTP
                 response.Close();
             }
             catch(Exception e)
             {
                 Console.WriteLine(e);
-            }
-           
-        }
-
-
-        /**
-           * Etabli un connexion FTP  puis télécharge plusieurs fichiers suivant la liste donnée en paramètre (
-           */
-        public void DownloadMultipleFilesFromFtp(List<string> listFilesPath, string localFolderPath)
-        {
-            //établir une connexion FTP permanente
-            FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
-            request.Credentials = new NetworkCredential(user, pwd);
-            using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
-            {
-                using (Stream responseStream = response.GetResponseStream())
-                {
-                    //parcourir la liste des fichiers à télécharger
-                    foreach (string remoteFilePath in listFilesPath)
-                    {
-                        //construire l'URL complète du fichier distant
-                        Uri fileUri = new Uri(new Uri(url), remoteFilePath);
-                        string fileUrl = fileUri.ToString();
-
-                        //créer le chemin complet du fichier local
-                        string destPath = Path.Combine(localFolderPath, Path.GetFileName(remoteFilePath));
-
-                        //télécharger le fichier distant
-                        DownloadFileFromFtp(request, fileUrl, destPath);
-                    }
-                }
-            }
+            }        
         }
 
 
@@ -168,13 +142,14 @@ namespace Test.Classes
             Console.WriteLine($"Téléchargement de {fileUrl} terminé.");
         }
 
+
         /**
          * 
          */
         public long GetFileSize(FtpWebRequest request, string fileUrl)
         {
-            
-            String path= this.url + "/" + fileUrl;
+
+            String path = this.url + "/" + fileUrl;
             Console.WriteLine("file uri: " + path);
             FtpWebRequest sizeRequest = (FtpWebRequest)WebRequest.Create(path);
             sizeRequest.Credentials = new NetworkCredential(user, pwd);
@@ -182,11 +157,54 @@ namespace Test.Classes
             sizeRequest.UseBinary = true;
 
             using (FtpWebResponse response = (FtpWebResponse)sizeRequest.GetResponse())
-            {             
+            {
                 return response.ContentLength;
             }
         }
 
+        /**
+           * Etabli un connexion FTP  puis télécharge plusieurs fichiers suivant la liste donnée en paramètre
+           */
+        public void DownloadMultipleFilesFromFtp(List<string> listFilesPath, string localFolderPath)
+        {
+            //établir une connexion FTP permanente
+            FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
+            request.Credentials = new NetworkCredential(user, pwd);
+            using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
+            {
+                using (Stream responseStream = response.GetResponseStream())
+                {
+                    //parcourir la liste des fichiers à télécharger
+                    foreach (string remoteFilePath in listFilesPath)
+                    {
+                        //construire l'URL complète du fichier distant
+                        Uri fileUri = new Uri(new Uri(url), remoteFilePath);
+                        string fileUrl = fileUri.ToString();
+
+                        //créer le chemin complet du fichier local
+                        string destPath = Path.Combine(localFolderPath, Path.GetFileName(remoteFilePath));
+
+                        //télécharger le fichier distant
+                        DownloadFileFromFtp(request, fileUrl, destPath);
+                    }
+                }
+            }
+        }
+
+        public bool IsNotJson(string filePath)
+        { 
+            string extension = Path.GetExtension(filePath);
+            if (extension == ".json")
+            {
+                Console.WriteLine(filePath + " est un json");
+                return false;
+            }
+            else
+            {
+                Console.WriteLine(filePath + " n'est pas un json");
+                return true;
+            }
+        }
     }
 }
 

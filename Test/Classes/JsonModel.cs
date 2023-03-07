@@ -79,5 +79,4 @@ public class Lignes
     public string created_at { get; set; }
     public string remisePDA { get; set; }
     public string poidsBrutUc { get; set; }
-
 }
