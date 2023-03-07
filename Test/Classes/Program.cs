@@ -12,6 +12,7 @@ namespace Test
 {
     class Program
     {
+        //constantes pour la connexion FTP
         public const string USER = "etienne";
         public const string PWD = "root";
         public const string URL = "ftp://127.0.0.1:21";

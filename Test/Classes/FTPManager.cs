@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-
+using System.Threading;
 
 namespace Test.Classes
 {
@@ -53,14 +53,39 @@ namespace Test.Classes
          */
         public void SyncFilesFromFtp(string localFolderPath)
         {
+            Console.WriteLine("Tentative de connexion au serveur par protocole FTP...");
             try
             {
-                //établir une connexion FTP permanente
+                //établir une connexion FTP
                 FtpWebRequest request = (FtpWebRequest)WebRequest.Create(url);
                 request.Credentials = new NetworkCredential(user, pwd);
                 request.Method = WebRequestMethods.Ftp.ListDirectory;
-                FtpWebResponse response = (FtpWebResponse)request.GetResponse();
-
+               
+                //vérifie si la connexion par FTP fonctionne
+                FtpWebResponse response = null;
+                bool isConnected = false;            
+                while (!isConnected)
+                {
+                    try
+                    {
+                        //TODO pas optimal mais ca marche
+                        //établir une connexion FTP
+                        FtpWebRequest newrequest = (FtpWebRequest)WebRequest.Create(url);
+                        request = newrequest;
+                        request.Credentials = new NetworkCredential(user, pwd);
+                        request.Method = WebRequestMethods.Ftp.ListDirectory;
+                        response = (FtpWebResponse)request.GetResponse();
+                        Console.WriteLine("connexion FTP établie");
+                        isConnected = true;
+                    }
+                    catch (WebException e)
+                    {
+                        // Attendre 5 secondes avant de retenter la connexion
+                        Thread.Sleep(5000);
+                        Console.WriteLine("pas de connexion FTP, nouvelle tentative dans 5s");
+                        Console.WriteLine("erreur -> "+ e+"\n");
+                    }
+                }
                 //liste des fichiers distants
                 List<string> remoteFiles = new List<string>();
                 using (StreamReader reader = new StreamReader(response.GetResponseStream()))
