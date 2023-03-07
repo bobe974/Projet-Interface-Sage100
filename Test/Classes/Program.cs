@@ -16,9 +16,18 @@ namespace Test
         public const string USER = "etienne";
         public const string PWD = "root";
         public const string URL = "ftp://127.0.0.1:21";
+        //emplacement où seront stockés les fichiers json téléchargés
         public const string LOCALFILEPATH = @"C:\Users\Utilisateur\Desktop\fichierLocal";
         //Chemin du fichier pour stocker les noms de fichiers traités
-        public const string processedFilesPath = @"C:\Users\Utilisateur\Desktop\fichierLocal\verif.txt";
+        public const string processedFilesPath = @"C:\Users\Utilisateur\Desktop\fichierLocal\processFile.txt";
+        //base de données SAGE
+        public const string DBCOMPTAPATH = @"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae";
+        public const string DBCOMPTAUSER = "<Administrateur>";
+        public const string DBCOMPTAPWD = "AR2003";
+
+        public const string DBCIALPATH = @"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm";
+        public const string DBCIALUSER = "<Administrateur>";
+        public const string DBCIALPWD = "AR2003";
 
 
         static void Main(string[] args)
@@ -35,8 +44,8 @@ namespace Test
             Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
 
             //Paramètres pour se connecter aux bases
-            ParamDb paramBaseCompta = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae", "<Administrateur>", "AR2003");
-            ParamDb paramBaseCial = new ParamDb(@"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.gcm", "<Administrateur>", "AR2003");
+            ParamDb paramBaseCompta = new ParamDb(DBCOMPTAPATH, DBCOMPTAUSER, DBCOMPTAPWD);
+            ParamDb paramBaseCial = new ParamDb(DBCIALPATH, DBCIALUSER, DBCIALPWD);
 
             //ouverture des bases de données
             Console.WriteLine("tentative de connexion a la base SAGE...");
@@ -68,7 +77,7 @@ namespace Test
             Console.ReadLine();
             CloseDB(dbCommerce, dbCompta);
             Console.ReadLine();
-       
+
             /*********************************************************Méthodes***********************************************************/
             bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
             {
@@ -279,10 +288,24 @@ namespace Test
                 }
             }
 
-           
+            void CheckProcessFile()
+            {
+                //vérifier si le fichier processfilesPath existe
+                if (!File.Exists(processedFilesPath))
+                {
+                    Console.WriteLine("création du fichier process");
+                    //créer le fichier
+                    using (StreamWriter writer = new StreamWriter(processedFilesPath))
+                    {
+                        Console.WriteLine("fichier process crée");
+                    }
+                }
+            }
+
             //Vérifie si le fichier a déjà été traité en vérifiant s'il figure dans la liste des fichiers traités
             bool IsFileAlreadyProcessed(string fileName)
             {
+                CheckProcessFile();
                 // Vérifier si le fichier a déjà été traité en lisant la liste des fichiers traités
                 string[] processedFiles = File.ReadAllLines(processedFilesPath);
                 Console.WriteLine(processedFiles.Contains(fileName));
@@ -292,6 +315,7 @@ namespace Test
             //Ajoute le nom du fichier à la liste des fichiers traités
             void AddFileAsProcessed(string fileName)
             {
+                CheckProcessFile();
                 //Ajouter le nom du fichier à la liste des fichiers traités
                 File.AppendAllText(processedFilesPath, fileName + Environment.NewLine);
             }
