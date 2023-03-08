@@ -1,24 +1,25 @@
 ﻿using System;
 using Newtonsoft.Json;
 using System.IO;
-using System.Net;
 using Test.Classes;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Transactions;
 
 namespace Test
 
 {
     class Program
     {
+
         //constantes pour la connexion FTP
         public const string USER = "etienne";
         public const string PWD = "root";
         public const string URL = "ftp://127.0.0.1:21";
         //emplacement où seront stockés les fichiers json téléchargés
         public const string LOCALFILEPATH = @"C:\Users\Utilisateur\Desktop\fichierLocal";
-        //Chemin du fichier pour stocker les noms de fichiers traités
+        //fichier pour stocker les noms de fichiers traités
         public const string processedFilesPath = @"C:\Users\Utilisateur\Desktop\fichierLocal\processFile.txt";
         //base de données SAGE
         public const string DBCOMPTAPATH = @"C:\Users\Utilisateur\Desktop\Projet 1\test\STOCKSERVICE.mae";
@@ -29,7 +30,6 @@ namespace Test
         public const string DBCIALUSER = "<Administrateur>";
         public const string DBCIALPWD = "AR2003";
 
-
         static void Main(string[] args)
         {
             //Connexion et récupération des json par FTP           
@@ -38,7 +38,7 @@ namespace Test
             Console.ReadLine();
 
             //Objet métier: ouverture des bdd  
-           //base comptable 
+            //base comptable 
             Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
             //base commerciale
             Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
@@ -52,26 +52,33 @@ namespace Test
             if (OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta)))
             {
                 Console.ReadLine();
-                //Lecture du fichier json 
-
                 //parcours des fichiers json dans le répertoire
                 List<string> localFiles = Directory.GetFiles(LOCALFILEPATH).ToList();
                 foreach (string s in localFiles)
                 {
-                    Console.WriteLine(s);   
+                    Console.WriteLine(s);
                     if (!(IsFileAlreadyProcessed(s))) // vérifie si le fichier a deja été traité
                     {
                         // génère un objet JsonModel depuis le fichier json
-                        Console.WriteLine("conversion de "+ s+ " en modele c#");
+                        Console.WriteLine("conversion de " + s + " en modele c#");
                         if (ValidateJson(s))
                         {
-                            JsonModel jsonModel = DeserialiseJson(s);
-                            //créer le bon de commande 
-                            Createcmd(jsonModel);
+                            try
+                            {
+                                JsonModel jsonModel = DeserialiseJson(s);
+                                ValidateInputData(jsonModel);
+                                //créer le bon de commande 
+                                Createcmd(jsonModel);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine($"Erreur lors de la validation des données d'entrée pour le fichier {s}: {e.Message}");
+                            }
+
                         }
                         //ajoute le nom du ficher dans la liste des fichiers traités
                         AddFileAsProcessed(s);
-                    }     
+                    }
                 }
             }
             Console.ReadLine();
@@ -146,50 +153,71 @@ namespace Test
                 Objets100cLib.IBODocumentVente3 entete = null;
                 Objets100cLib.IBODocumentVenteLigne3 lignes = null;
 
-                try
-                {
-                    entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-                    //affecte un client au bon de commande
-                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
-                    entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
-                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
-                    Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
-                    //attibuer la souche de type PDA
-                    entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
-                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
-                    entete.SetDefaultDO_Piece();
-                    //entete.DO_Ref = "UUUU";
-                    //entete.DO_TotalHT = jsonObject.totalHT;
-                    // entete.DO_TotalTTC = jsonObject.totalTTC;
-                    entete.Write();
-                    Console.WriteLine("entete du document crée!");
+                // Vérification des contraintes de cohérence
+                DateTime dateCommande = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss");
+                DateTime dateLivraison = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
 
-                    // lister les info libres
-                    Console.WriteLine("liste des champs infos libres");
-                    foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
-                    {
-                        Console.WriteLine("Intitulé : " + field.Name);
-                    }
-                    //insertion infos libres
-                    entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
-                    entete.Write();
-                    //ajout des lignes (articles) dans le document 
-                    //parcours de la collection de ligne du document json
-                    Console.WriteLine("nb de lignes:" + jsonObject.lignes.Count);
-                    foreach (Lignes l in jsonObject.lignes)
-                    {
-                        //ajout d'un article dans le document
-                        lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
-                        Objets100cLib.IBOArticle3 article = dbCommerce.FactoryArticle.ReadReference(l.codeArticle);
-                        Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
-                        lignes.SetDefaultArticle(article, l.quantiteUc);              
-                        lignes.Write();
-                    }
-                    Console.WriteLine("articles ajoutés");
-                }
-                catch (Exception e)
+                if (dateLivraison < dateCommande)
                 {
-                    Console.WriteLine(e);
+                    throw new ArgumentException("La date de livraison doit être postérieure à la date de commande");
+                }
+
+                // Vérification de la validité des données
+                if (!dbCompta.FactoryClient.ExistNumero(jsonObject.codeClient))
+                {
+                    throw new ArgumentException("Le code client n'existe pas dans la base de données Sage");
+                }
+
+                //ouvre une transaction pour insérer le bon de commande dans la base de données
+                using (var transaction = new System.Transactions.TransactionScope())
+                {
+                    try
+                    {
+                        entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
+                        //affecte un client au bon de commande
+                        entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
+                        entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
+                        entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
+                        Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                        //attibuer la souche de type PDA
+                        entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
+                        //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
+                        entete.SetDefaultDO_Piece();
+                        //entete.DO_Ref = "UUUU";
+                        //entete.DO_TotalHT = jsonObject.totalHT;
+                        // entete.DO_TotalTTC = jsonObject.totalTTC;
+                        entete.Write();
+                        Console.WriteLine("entete du document crée!");
+
+                        // lister les info libres
+                        Console.WriteLine("liste des champs infos libres");
+                        foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
+                        {
+                            Console.WriteLine("Intitulé : " + field.Name);
+                        }
+                        //insertion infos libres
+                        entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
+                        entete.Write();
+                        //ajout des lignes (articles) dans le document 
+                        //parcours de la collection de ligne du document json
+                        Console.WriteLine("nb de lignes:" + jsonObject.lignes.Count);
+                        foreach (Lignes l in jsonObject.lignes)
+                        {
+                            //ajout d'un article dans le document
+                            lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
+                            Objets100cLib.IBOArticle3 article = dbCommerce.FactoryArticle.ReadReference(l.codeArticle);
+                            Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
+                            lignes.SetDefaultArticle(article, l.quantiteUc);
+                            lignes.Write();
+                        }
+                        //Commit la transaction
+                        transaction.Complete();
+                        Console.WriteLine("articles ajoutés");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("erreur pour la création du bon de commande: " + e);
+                    }
                 }
             }
 
@@ -201,11 +229,11 @@ namespace Test
 
                 try
                 {
-                    
+
                     entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
                     Objets100cLib.IPMDocument mProcessDoc = (Objets100cLib.IPMDocument)dbCommerce.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
                     entete = (Objets100cLib.IBODocumentVente3)mProcessDoc.Document;
-                   
+
                     entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
 
                     entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
@@ -215,7 +243,7 @@ namespace Test
                     entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
                     //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
                     entete.SetDefaultDO_Piece();
-                   
+
                     Console.WriteLine("entete du document crée!");
 
                     // lister les info libres
@@ -227,7 +255,7 @@ namespace Test
                     }
                     //insertion infos libres
                     entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
-                 
+
 
                     //ajout des lignes dans le document 
                     //parcours de la collection de ligne du document json
@@ -235,10 +263,10 @@ namespace Test
                     foreach (Lignes l in jsonObject.lignes)
                     {
                         //ajout d'un article dans le document
-                       
+
                         mProcessDoc.AddArticle(dbCommerce.FactoryArticle.ReadReference(l.codeArticle), l.quantiteUc);
                         Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
-                        
+
                     }
                     //lignes.Article.AR_Ref = "08G1DANA";
                     // lignes.Write();
@@ -251,7 +279,7 @@ namespace Test
                     Console.WriteLine(e);
                 }
             }
-           
+
             /**
              * Converti un fichier json en objet C#
              */
@@ -288,6 +316,9 @@ namespace Test
                 }
             }
 
+            /**
+             * Vérifie si le fichier processed existe, dans la cas contraire, on créer le fichier
+             */
             void CheckProcessFile()
             {
                 //vérifier si le fichier processfilesPath existe
@@ -302,17 +333,21 @@ namespace Test
                 }
             }
 
-            //Vérifie si le fichier a déjà été traité en vérifiant s'il figure dans la liste des fichiers traités
+            /**
+             * Vérifie si le fichier a déjà été traité en vérifiant s'il figure dans la liste des fichiers traités
+             */
             bool IsFileAlreadyProcessed(string fileName)
             {
                 CheckProcessFile();
-                // Vérifier si le fichier a déjà été traité en lisant la liste des fichiers traités
+                //Vérifier si le fichier a déjà été traité en lisant la liste des fichiers traités
                 string[] processedFiles = File.ReadAllLines(processedFilesPath);
                 Console.WriteLine(processedFiles.Contains(fileName));
                 return processedFiles.Contains(fileName);
             }
 
-            //Ajoute le nom du fichier à la liste des fichiers traités
+            /**
+             * Ajoute le nom du fichier à la liste des fichiers traités
+             */
             void AddFileAsProcessed(string fileName)
             {
                 CheckProcessFile();
@@ -320,8 +355,11 @@ namespace Test
                 File.AppendAllText(processedFilesPath, fileName + Environment.NewLine);
             }
 
-              bool ValidateJson(string filePath)
-              { 
+            /**
+             * Valide la structure d'un fichier JSON
+             */
+            bool ValidateJson(string filePath)
+            {
                 string jsonString = File.ReadAllText(filePath);
 
                 try
@@ -338,6 +376,30 @@ namespace Test
                 }
 
             }
+
+            /**
+             * Vérifie les champs obligatoires du fichier json sérialisé en objet c#
+             */
+            void ValidateInputData(JsonModel jsonObject)
+            {
+                if (string.IsNullOrEmpty(jsonObject.codeClient))
+                {
+                    throw new ArgumentException("Le code client ne peut pas être vide.");
+                }
+                if (string.IsNullOrEmpty(jsonObject.dateCommande))
+                {
+                    throw new ArgumentException("La date de commande ne peut pas être vide.");
+                }
+                if (string.IsNullOrEmpty(jsonObject.dateLivraison))
+                {
+                    throw new ArgumentException("La date de livraison ne peut pas être vide.");
+                }
+                if (jsonObject.lignes == null || jsonObject.lignes.Count == 0)
+                {
+                    throw new ArgumentException("Le bon de commande doit avoir au moins une ligne.");
+                }
+            }
+
         }
     }
 }
