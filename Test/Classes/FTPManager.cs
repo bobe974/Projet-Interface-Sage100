@@ -43,7 +43,6 @@ namespace Test.Classes
             {
                 Console.WriteLine(e);
             }
-            
 
         }
 
@@ -53,7 +52,7 @@ namespace Test.Classes
          */
         public void SyncFilesFromFtp(string localFolderPath)
         {
-            Console.WriteLine("Tentative de connexion au serveur par protocole FTP...");
+            Console.WriteLine("Tentative de connexion au serveur par protocole FTP...\n");
             try
             {
                 //établir une connexion FTP
@@ -75,7 +74,7 @@ namespace Test.Classes
                         request.Credentials = new NetworkCredential(user, pwd);
                         request.Method = WebRequestMethods.Ftp.ListDirectory;
                         response = (FtpWebResponse)request.GetResponse();
-                        Console.WriteLine("connexion FTP établie");
+                        Console.WriteLine("connexion FTP établie\n");
                         isConnected = true;
                     }
                     catch (WebException e)
@@ -91,9 +90,11 @@ namespace Test.Classes
                 using (StreamReader reader = new StreamReader(response.GetResponseStream()))
                 {
                     string line = reader.ReadLine();
-                    Console.WriteLine("line:" + line);
-                    while (!string.IsNullOrEmpty(line))  //pas de ficiers vide ou qui ne sont pas des .json
+                    Console.WriteLine("liste des fichiers trouvés sur le serveur FTP: \n");
+
+                    while (!string.IsNullOrEmpty(line))  //pas de fichiers vide ou qui ne sont pas des .json
                     {
+                        Console.WriteLine(line);
                         if (!(IsNotJson(line))) // si c'est un json on l'ajoute à la liste des téléchargements
                         {
                             remoteFiles.Add(line);   
@@ -102,6 +103,7 @@ namespace Test.Classes
                     }
                 }
 
+                Console.WriteLine("");
                 //liste des fichiers locaux
                 List<string> localFiles = Directory.GetFiles(localFolderPath).ToList();
 
@@ -109,11 +111,10 @@ namespace Test.Classes
                 foreach (string remoteFilePath in remoteFiles)
                 {
                     string fileName = Path.GetFileName(remoteFilePath);
-                    string localFilePath = Path.Combine(localFolderPath, fileName); //path dossier local + nom fichier distant
-                    Console.WriteLine("remote filepath:" + remoteFilePath);
+                    string localFilePath = Path.Combine(localFolderPath, fileName); //path dossier local + nom fichier distant    
+
                     if (localFiles.Contains(localFilePath))
-                    {
-                        //cas fichier existant, vérifier la taille 
+                    {                    
                         long remoteFileSize = GetFileSize(request, remoteFilePath);
                         long localFileSize = new FileInfo(localFilePath).Length;
                         Console.WriteLine("taille du fichier local: " + localFileSize);
@@ -221,12 +222,12 @@ namespace Test.Classes
             string extension = Path.GetExtension(filePath);
             if (extension == ".json")
             {
-                Console.WriteLine(filePath + " est un json");
+                //Console.WriteLine(filePath + " est un json");
                 return false;
             }
             else
             {
-                Console.WriteLine(filePath + " n'est pas un json");
+                //Console.WriteLine(filePath + " n'est pas un json");
                 return true;
             }
         }

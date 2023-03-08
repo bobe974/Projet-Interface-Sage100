@@ -44,40 +44,41 @@ namespace Test
             Console.WriteLine("tentative de connexion a la base SAGE...");
             SageCommandeManager sage = new SageCommandeManager(paramBaseCompta, paramBaseCial);
 
-            if (sage.isconnnected)
+            if (sage.isconnected)
             {
                 Console.ReadLine();
                 //parcours des fichiers json dans le répertoire
                 List<string> localFiles = Directory.GetFiles(LOCALFILEPATH).ToList();
                 foreach (string s in localFiles)
                 {
+                    Console.WriteLine("*******************************************Bon de commande*******************************************");
                     Console.WriteLine(s);
                     if (!(IsFileAlreadyProcessed(s))) // vérifie si le fichier a deja été traité
                     {
                         // génère un objet JsonModel depuis le fichier json
-                        Console.WriteLine("conversion de " + s + " en modele c#");
+                        Console.WriteLine("conversion de " + s + " en modele C#");
                         if (ValidateJson(s))
                         {
                             try
                             {
                                 JsonModel jsonModel = DeserialiseJson(s);
                                 ValidateInputData(jsonModel);
-
                                 //créer le bon de commande 
-                                sage.Createcmd(jsonModel);
+                                if (sage.Createcmd(jsonModel))
+                                {
+                                    //ajoute le nom du ficher dans la liste des fichiers traités
+                                    AddFileAsProcessed(s);
+                                }                        
                             }
                             catch (Exception e)
                             {
-                                Console.WriteLine($"Erreur lors de la validation des données d'entrée pour le fichier {s}: {e.Message}");
+                                Console.WriteLine($"Erreur lors de la validation du modèle de données JSON d'entrée pour le fichier {s}: {e.Message}");
                             }
-
-                        }
-                        //ajoute le nom du ficher dans la liste des fichiers traités
-                        AddFileAsProcessed(s);
+                        }   
                     }
                 }
             }
-            Console.ReadLine();
+            Console.ReadLine(); 
             sage.CloseDB();
             Console.ReadLine();
 
@@ -90,7 +91,7 @@ namespace Test
             {
                 try
                 {
-                    Console.WriteLine("Lecture du fichier Json:" + path);
+                    Console.WriteLine("Lecture du fichier Json:" + path + "\n");
                     string json = File.ReadAllText(path);
                     //conversion du json en Objet c#
                     JsonModel obj = JsonConvert.DeserializeObject<JsonModel>(json);
@@ -100,22 +101,6 @@ namespace Test
                 {
                     Console.WriteLine(e);
                     return null;
-                }
-            }
-
-            /**
-             * Converti une chaine de caractère en Date au format choisi
-             */
-            DateTime StringToDate(string dateString, String format)
-            {
-                DateTime date;
-                if (DateTime.TryParseExact(dateString, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
-                {
-                    return date;
-                }
-                else
-                {
-                    throw new ArgumentException("La chaîne fournie n'est pas au format attendu", nameof(dateString));
                 }
             }
 
@@ -144,7 +129,7 @@ namespace Test
                 CheckProcessFile();
                 //Vérifier si le fichier a déjà été traité en lisant la liste des fichiers traités
                 string[] processedFiles = File.ReadAllLines(processedFilesPath);
-                Console.WriteLine(processedFiles.Contains(fileName));
+                Console.WriteLine($"le ficher à déja été traité? {processedFiles.Contains(fileName)}");
                 return processedFiles.Contains(fileName);
             }
 

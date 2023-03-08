@@ -9,7 +9,7 @@ namespace Test.Classes
         private Objets100cLib.BSCPTAApplication100c dbCompta;
         //base commerciale
         private Objets100cLib.BSCIALApplication100c dbCommerce;
-        public bool isconnnected = false;
+        public bool isconnected = false;
 
         public SageCommandeManager(ParamDb paramCompta, ParamDb paramCommercial)
         {
@@ -18,7 +18,7 @@ namespace Test.Classes
             this.dbCommerce = new Objets100cLib.BSCIALApplication100c();
             if (OpenDbComptable(dbCompta, paramCompta) && (OpenDbCommercial(dbCommerce, paramCommercial, dbCompta)))
             {
-                isconnnected = true;
+                isconnected = true;
             }
         }
 
@@ -82,7 +82,7 @@ namespace Test.Classes
         /**
          * Créer un bon de commande et l'insert dans la base de données
          */
-        public void Createcmd(JsonModel jsonObject)
+        public bool Createcmd(JsonModel jsonObject)
         {
             //entete du bon de commande
             Console.WriteLine("Création d'un bon de commande...");
@@ -95,13 +95,22 @@ namespace Test.Classes
 
             if (dateLivraison < dateCommande)
             {
-                throw new ArgumentException("La date de livraison doit être postérieure à la date de commande");
+                throw new ArgumentException("La date de livraison doit être postérieur à la date de commande");
             }
 
             // Vérification de la validité des données
             if (!dbCompta.FactoryClient.ExistNumero(jsonObject.codeClient))
             {
                 throw new ArgumentException("Le code client n'existe pas dans la base de données Sage");
+            }
+
+            //vérification des articles
+            foreach (Lignes l in jsonObject.lignes)
+            {
+                if (!dbCommerce.FactoryArticle.ExistReference(l.codeArticle))
+                {
+                    throw new ArgumentException($"Le code article {l.codeArticle} n'existe pas dans la base de données Sage");
+                }            
             }
 
             //ouvre une transaction pour insérer le bon de commande dans la base de données
@@ -125,12 +134,6 @@ namespace Test.Classes
                     entete.Write();
                     Console.WriteLine("entete du document crée!");
 
-                    // lister les info libres
-                    Console.WriteLine("liste des champs infos libres");
-                    foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
-                    {
-                        Console.WriteLine("Intitulé : " + field.Name);
-                    }
                     //insertion infos libres
                     entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
                     entete.Write();
@@ -142,17 +145,19 @@ namespace Test.Classes
                         //ajout d'un article dans le document
                         lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
                         Objets100cLib.IBOArticle3 article = dbCommerce.FactoryArticle.ReadReference(l.codeArticle);
-                        Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
+                        Console.WriteLine("tentative d'insertion de l'article: " + l.codeArticle + " qte: " + l.quantiteUc);
                         lignes.SetDefaultArticle(article, l.quantiteUc);
                         lignes.Write();
                     }
                     //Commit la transaction
                     transaction.Complete();
-                    Console.WriteLine("articles ajoutés");
+                    Console.WriteLine("Articles ajoutés\n");
+                    return true;
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("erreur pour la création du bon de commande: " + e);
+                    Console.WriteLine("Erreur pour la création du bon de commande: " + e);
+                    return false;
                 }
             }
         }
@@ -202,13 +207,14 @@ namespace Test.Classes
                     //ajout d'un article dans le document
 
                     mProcessDoc.AddArticle(dbCommerce.FactoryArticle.ReadReference(l.codeArticle), l.quantiteUc);
-                    Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
+                    Console.WriteLine("tentative d'insertion de l'article :" + l.codeArticle + " qte:" + l.quantiteUc);
 
                 }
                 //lignes.Article.AR_Ref = "08G1DANA";
                 // lignes.Write();
                 mProcessDoc.Process();
-                Console.WriteLine("articles ajoutés");
+                Console.WriteLine("");
+                Console.WriteLine("articles ajoutés\n");
 
             }
             catch (Exception e)
@@ -229,7 +235,8 @@ namespace Test.Classes
             }
             else
             {
-                throw new ArgumentException("La chaîne fournie n'est pas au format attendu", nameof(dateString));
+                throw new ArgumentException("La date n'est pas au format attendu", nameof(dateString));
+
             }
         }
     }
