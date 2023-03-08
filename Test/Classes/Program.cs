@@ -5,7 +5,6 @@ using Test.Classes;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Transactions;
 
 namespace Test
 
@@ -37,19 +36,15 @@ namespace Test
             ftp.SyncFilesFromFtp(LOCALFILEPATH);
             Console.ReadLine();
 
-            //Objet métier: ouverture des bdd  
-            //base comptable 
-            Objets100cLib.BSCPTAApplication100c dbCompta = new Objets100cLib.BSCPTAApplication100c();
-            //base commerciale
-            Objets100cLib.BSCIALApplication100c dbCommerce = new Objets100cLib.BSCIALApplication100c();
-
             //Paramètres pour se connecter aux bases
             ParamDb paramBaseCompta = new ParamDb(DBCOMPTAPATH, DBCOMPTAUSER, DBCOMPTAPWD);
             ParamDb paramBaseCial = new ParamDb(DBCIALPATH, DBCIALUSER, DBCIALPWD);
 
             //ouverture des bases de données
             Console.WriteLine("tentative de connexion a la base SAGE...");
-            if (OpenDbComptable(dbCompta, paramBaseCompta) && (OpenDbCommercial(dbCommerce, paramBaseCial, dbCompta)))
+            SageCommandeManager sage = new SageCommandeManager(paramBaseCompta, paramBaseCial);
+
+            if (sage.isconnnected)
             {
                 Console.ReadLine();
                 //parcours des fichiers json dans le répertoire
@@ -67,8 +62,9 @@ namespace Test
                             {
                                 JsonModel jsonModel = DeserialiseJson(s);
                                 ValidateInputData(jsonModel);
+
                                 //créer le bon de commande 
-                                Createcmd(jsonModel);
+                                sage.Createcmd(jsonModel);
                             }
                             catch (Exception e)
                             {
@@ -82,203 +78,10 @@ namespace Test
                 }
             }
             Console.ReadLine();
-            CloseDB(dbCommerce, dbCompta);
+            sage.CloseDB();
             Console.ReadLine();
 
             /*********************************************************Méthodes***********************************************************/
-            bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
-            {
-                try
-                {
-                    //ouverture de la base comptable 
-                    dbComptable.Name = paramCpta.getDbname();
-                    dbComptable.Loggable.UserName = paramCpta.getuser();
-                    dbComptable.Loggable.UserPwd = paramCpta.getpwd();
-
-                    dbComptable.Open();
-                    Console.WriteLine("succes connexion à " + paramCpta.getDbname());
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("erreur pour l'ouverture de la base comptable: " + e);
-                    return false;
-                }
-            }
-
-            bool OpenDbCommercial(Objets100cLib.BSCIALApplication100c dbCommercial, ParamDb paramCial, Objets100cLib.BSCPTAApplication100c bdcompta)
-            {
-                try
-                {
-                    //ouverture de la base comptable 
-                    dbCommercial.Name = paramCial.getDbname();
-                    dbCommercial.Loggable.UserName = paramCial.getuser();
-                    dbCommercial.Loggable.UserPwd = paramCial.getpwd();
-                    dbCommercial.CptaApplication = bdcompta;
-
-                    dbCommercial.Open();
-                    Console.WriteLine("succes connexion à " + paramCial.getDbname());
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("erreur pour l'ouverture de la base commerciale: " + e);
-                    return false;
-                }
-            }
-
-            bool CloseDB(Objets100cLib.BSCIALApplication100c dbCommercial, Objets100cLib.BSCPTAApplication100c dbComptable)
-            {
-                try
-                {
-                    dbComptable.Close();
-                    dbCommercial.Close();
-                    Console.WriteLine("base fermée");
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                    return false;
-                }
-            }
-
-            /**
-             * Créer un bon de commande et l'insert dans la base de données
-             */
-            void Createcmd(JsonModel jsonObject)
-            {
-                //entete du bon de commande
-                Console.WriteLine("Création d'un bon de commande...");
-                Objets100cLib.IBODocumentVente3 entete = null;
-                Objets100cLib.IBODocumentVenteLigne3 lignes = null;
-
-                // Vérification des contraintes de cohérence
-                DateTime dateCommande = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss");
-                DateTime dateLivraison = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
-
-                if (dateLivraison < dateCommande)
-                {
-                    throw new ArgumentException("La date de livraison doit être postérieure à la date de commande");
-                }
-
-                // Vérification de la validité des données
-                if (!dbCompta.FactoryClient.ExistNumero(jsonObject.codeClient))
-                {
-                    throw new ArgumentException("Le code client n'existe pas dans la base de données Sage");
-                }
-
-                //ouvre une transaction pour insérer le bon de commande dans la base de données
-                using (var transaction = new System.Transactions.TransactionScope())
-                {
-                    try
-                    {
-                        entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-                        //affecte un client au bon de commande
-                        entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
-                        entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
-                        entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
-                        Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
-                        //attibuer la souche de type PDA
-                        entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
-                        //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
-                        entete.SetDefaultDO_Piece();
-                        //entete.DO_Ref = "UUUU";
-                        //entete.DO_TotalHT = jsonObject.totalHT;
-                        // entete.DO_TotalTTC = jsonObject.totalTTC;
-                        entete.Write();
-                        Console.WriteLine("entete du document crée!");
-
-                        // lister les info libres
-                        Console.WriteLine("liste des champs infos libres");
-                        foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
-                        {
-                            Console.WriteLine("Intitulé : " + field.Name);
-                        }
-                        //insertion infos libres
-                        entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
-                        entete.Write();
-                        //ajout des lignes (articles) dans le document 
-                        //parcours de la collection de ligne du document json
-                        Console.WriteLine("nb de lignes:" + jsonObject.lignes.Count);
-                        foreach (Lignes l in jsonObject.lignes)
-                        {
-                            //ajout d'un article dans le document
-                            lignes = (Objets100cLib.IBODocumentVenteLigne3)entete.FactoryDocumentLigne.Create();
-                            Objets100cLib.IBOArticle3 article = dbCommerce.FactoryArticle.ReadReference(l.codeArticle);
-                            Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
-                            lignes.SetDefaultArticle(article, l.quantiteUc);
-                            lignes.Write();
-                        }
-                        //Commit la transaction
-                        transaction.Complete();
-                        Console.WriteLine("articles ajoutés");
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("erreur pour la création du bon de commande: " + e);
-                    }
-                }
-            }
-
-            void Createprocesscmd(JsonModel jsonObject)
-            {
-                //entete du bon de commande
-                Console.WriteLine("Création d'un bon de commande...");
-                Objets100cLib.IBODocumentVente3 entete = null;
-
-                try
-                {
-
-                    entete = dbCommerce.FactoryDocumentVente.CreateType(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-                    Objets100cLib.IPMDocument mProcessDoc = (Objets100cLib.IPMDocument)dbCommerce.CreateProcess_Document(Objets100cLib.DocumentType.DocumentTypeVenteCommande);
-                    entete = (Objets100cLib.IBODocumentVente3)mProcessDoc.Document;
-
-                    entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
-
-                    entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
-                    entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
-                    Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
-                    //attibuer la souche de type PDA
-                    entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
-                    //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
-                    entete.SetDefaultDO_Piece();
-
-                    Console.WriteLine("entete du document crée!");
-
-                    // lister les info libres
-
-                    Console.WriteLine("liste des champs infos libres");
-                    foreach (Objets100cLib.IBIField field in dbCommerce.FactoryDocument.InfoLibreFields)
-                    {
-                        Console.WriteLine("Intitulé : " + field.Name);
-                    }
-                    //insertion infos libres
-                    entete.InfoLibre["IDBIZIIPAD"] = jsonObject.idEntete;
-
-
-                    //ajout des lignes dans le document 
-                    //parcours de la collection de ligne du document json
-                    Console.WriteLine("nb de lignes:" + jsonObject.lignes.Count);
-                    foreach (Lignes l in jsonObject.lignes)
-                    {
-                        //ajout d'un article dans le document
-
-                        mProcessDoc.AddArticle(dbCommerce.FactoryArticle.ReadReference(l.codeArticle), l.quantiteUc);
-                        Console.WriteLine("tentative d'insértion de :" + l.codeArticle + "qte:" + l.quantiteUc);
-
-                    }
-                    //lignes.Article.AR_Ref = "08G1DANA";
-                    // lignes.Write();
-                    mProcessDoc.Process();
-                    Console.WriteLine("articles ajoutés");
-
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e);
-                }
-            }
 
             /**
              * Converti un fichier json en objet C#
@@ -399,7 +202,6 @@ namespace Test
                     throw new ArgumentException("Le bon de commande doit avoir au moins une ligne.");
                 }
             }
-
         }
     }
 }

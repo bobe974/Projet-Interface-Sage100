@@ -92,6 +92,7 @@
     <Compile Include="Classes\JsonModel.cs" />
     <Compile Include="Classes\ParamDb.cs" />
     <Compile Include="Classes\Program.cs" />
+    <Compile Include="Classes\SageCommandeManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
