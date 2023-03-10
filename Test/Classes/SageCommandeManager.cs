@@ -7,9 +7,30 @@ namespace Test.Classes
     {
         //base comptable 
         private Objets100cLib.BSCPTAApplication100c dbCompta;
-        //base commerciale
+        //base commerciale 
         private Objets100cLib.BSCIALApplication100c dbCommerce;
         public bool isconnected = false;
+
+        string[,] souchesStockservice = new string[3, 18]
+        {
+            {"BO", "STS21", "STS22", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
+            {"GM", "STS01", "STS02", "STS03", "STS04", "STS05", "STS06", "WEB01", "STS07", "STS08", "STS30", "STS31", "STS32", "STS34", "STS35", "FLUID", "RUNMARKET", "EDI"},
+            {"IM", "STS11", "STS12", "STS13", "STS14", "STS22", "STS33", "", "", "", "", "", "", "", "", "", "", ""}
+        };
+
+        string[,] souchesDisbp = new string[3, 19]
+        {
+            {"BO", "DSP21", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
+            {"GM", "DSP01", "DSP02", "DSP03", "DSP04", "DSP05", "DSP06", "WEB01", "DSP07", "DSP08", "DSP30", "DSP32", "DSP98", "DSP34", "DSP35", "FLUID", "RUNMARKET", "DSP31", "EDI"},
+            {"IM", "DSP11", "DSP12", "DSP13", "DSP14", "DSP22", "DSP33", "", "", "", "", "", "", "", "", "", "", "",""}
+        };
+
+        string[,] souchesRedisma = new string[3, 19]
+        {
+             {"BO", "RED21", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",""},
+             {"GM", "RED01", "RED02", "RED03", "RED04", "RED05", "RED06", "WEB01", "RED07", "RED08", "RED30", "RED32", "RED98", "RED34", "RED35", "FLUID", "RUNMARKET", "RED31", "EDI"},
+             {"IM", "RED11", "RED12", "RED13", "RED14", "RED22", "RED33", "", "", "", "", "", "", "", "", "", "", "",""}
+        };
 
         public SageCommandeManager(ParamDb paramCompta, ParamDb paramCommercial)
         {
@@ -25,7 +46,7 @@ namespace Test.Classes
         bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
         {
             try
-            {
+            {          
                 //ouverture de la base comptable 
                 dbComptable.Name = paramCpta.getDbname();
                 dbComptable.Loggable.UserName = paramCpta.getuser();
@@ -51,7 +72,6 @@ namespace Test.Classes
                 dbCommercial.Loggable.UserName = paramCial.getuser();
                 dbCommercial.Loggable.UserPwd = paramCial.getpwd();
                 dbCommercial.CptaApplication = bdcompta;
-
                 dbCommercial.Open();
                 Console.WriteLine("succes connexion à " + paramCial.getDbname());
                 return true;
@@ -98,7 +118,7 @@ namespace Test.Classes
                 throw new ArgumentException("La date de livraison doit être postérieur à la date de commande");
             }
 
-            // Vérification de la validité des données
+            //Vérification de la validité des données
             if (!dbCompta.FactoryClient.ExistNumero(jsonObject.codeClient))
             {
                 throw new ArgumentException("Le code client n'existe pas dans la base de données Sage");
@@ -110,7 +130,7 @@ namespace Test.Classes
                 if (!dbCommerce.FactoryArticle.ExistReference(l.codeArticle))
                 {
                     throw new ArgumentException($"Le code article {l.codeArticle} n'existe pas dans la base de données Sage");
-                }            
+                }
             }
 
             //ouvre une transaction pour insérer le bon de commande dans la base de données
@@ -124,11 +144,12 @@ namespace Test.Classes
                     entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
                     entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
                     Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                    //TODO vérifier que la souche existe avant insertion
                     //attibuer la souche de type PDA
                     entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
                     //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
                     entete.SetDefaultDO_Piece();
-                    //entete.DO_Ref = "UUUU";
+                    entete.DO_Ref = jsonObject.codeTerminal + jsonObject.idEntete;
                     //entete.DO_TotalHT = jsonObject.totalHT;
                     // entete.DO_TotalTTC = jsonObject.totalTTC;
                     entete.Write();
@@ -215,7 +236,6 @@ namespace Test.Classes
                 mProcessDoc.Process();
                 Console.WriteLine("");
                 Console.WriteLine("articles ajoutés\n");
-
             }
             catch (Exception e)
             {
@@ -238,6 +258,29 @@ namespace Test.Classes
                 throw new ArgumentException("La date n'est pas au format attendu", nameof(dateString));
 
             }
+        }
+
+        /**
+         * retourne la souche correspondant au code terminal
+         */
+        public String getSouche(String codeTerminal, string[,] tabCorrespondance)
+        {
+            string souche = null;
+            for (int i = 0; i < tabCorrespondance.GetLength(0); i++){
+
+                for(int j =0; j< tabCorrespondance.GetLength(1); j++)
+                {
+                    Console.WriteLine("i: " + i + "j: "+ j + " "+ tabCorrespondance[i,j]);
+                    if(codeTerminal == tabCorrespondance[i, j])
+                    {
+                        Console.WriteLine(codeTerminal + "trouvé a la position: " + i + j);
+                        Console.WriteLine(codeTerminal + "respond donc à la souche" + tabCorrespondance[i, 0]);
+                        //les souches  sont a l'index 0 de chaque tableau
+                        souche = tabCorrespondance[i, 0];                   
+                    }
+                }
+            }
+            return souche;
         }
     }
 }
