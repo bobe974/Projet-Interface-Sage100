@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,22 +9,29 @@ namespace Test.Classes
 {
     public class ParamDb
     {
-        private String dbName, user, pwd;
+        private String dbPath, user, pwd;
 
-        public ParamDb(String dbName, String user, String pwd)
+        public ParamDb(String dbPath, String user, String pwd)
         {
-            this.dbName = dbName;
+            this.dbPath = dbPath;
             this.user = user;
             this.pwd = pwd;
         }
 
-        public String getDbname()
-        { return this.dbName; }
+        public String getDbPath()
+        { return this.dbPath; }
 
         public String getuser()
         { return this.user; }
 
         public String getpwd()
         { return this.pwd; }
+
+        public String getName()
+        {        
+            string fileName = Path.GetFileNameWithoutExtension(dbPath);      
+            Console.WriteLine("filename: "+fileName);         
+            return fileName;
+        }
     }
 }

@@ -186,7 +186,7 @@ namespace Test
                 {
                     throw new ArgumentException("Le bon de commande doit avoir au moins une ligne.");
                 }
-            }
+            } 
         }
     }
 }

@@ -9,23 +9,25 @@ namespace Test.Classes
         private Objets100cLib.BSCPTAApplication100c dbCompta;
         //base commerciale 
         private Objets100cLib.BSCIALApplication100c dbCommerce;
+        private string dbname = null;
         public bool isconnected = false;
 
-        string[,] souchesStockservice = new string[3, 18]
+
+        public string[,] souchesStockservice = new string[3, 18]
         {
             {"BO", "STS21", "STS22", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
             {"GM", "STS01", "STS02", "STS03", "STS04", "STS05", "STS06", "WEB01", "STS07", "STS08", "STS30", "STS31", "STS32", "STS34", "STS35", "FLUID", "RUNMARKET", "EDI"},
-            {"IM", "STS11", "STS12", "STS13", "STS14", "STS22", "STS33", "", "", "", "", "", "", "", "", "", "", ""}
+            {"IMP", "STS11", "STS12", "STS13", "STS14", "STS22", "STS33", "", "", "", "", "", "", "", "", "", "", ""}
         };
 
-        string[,] souchesDisbp = new string[3, 19]
+        public string[,] souchesDisbp = new string[3, 19]
         {
             {"BO", "DSP21", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""},
             {"GM", "DSP01", "DSP02", "DSP03", "DSP04", "DSP05", "DSP06", "WEB01", "DSP07", "DSP08", "DSP30", "DSP32", "DSP98", "DSP34", "DSP35", "FLUID", "RUNMARKET", "DSP31", "EDI"},
             {"IM", "DSP11", "DSP12", "DSP13", "DSP14", "DSP22", "DSP33", "", "", "", "", "", "", "", "", "", "", "",""}
         };
 
-        string[,] souchesRedisma = new string[3, 19]
+        public string[,] souchesRedisma = new string[3, 19]
         {
              {"BO", "RED21", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",""},
              {"GM", "RED01", "RED02", "RED03", "RED04", "RED05", "RED06", "WEB01", "RED07", "RED08", "RED30", "RED32", "RED98", "RED34", "RED35", "FLUID", "RUNMARKET", "RED31", "EDI"},
@@ -37,23 +39,25 @@ namespace Test.Classes
             //initialisation et connexion aux bases sage100
             this.dbCompta = new Objets100cLib.BSCPTAApplication100c();
             this.dbCommerce = new Objets100cLib.BSCIALApplication100c();
+            //récupere le nom de la base pour faire des traitements personnalisés
+            this.dbname = paramCommercial.getName();
             if (OpenDbComptable(dbCompta, paramCompta) && (OpenDbCommercial(dbCommerce, paramCommercial, dbCompta)))
             {
                 isconnected = true;
             }
         }
-
         bool OpenDbComptable(Objets100cLib.BSCPTAApplication100c dbComptable, ParamDb paramCpta)
         {
             try
-            {          
+            {
                 //ouverture de la base comptable 
-                dbComptable.Name = paramCpta.getDbname();
+                paramCpta.getName();
+                dbComptable.Name = paramCpta.getDbPath();
                 dbComptable.Loggable.UserName = paramCpta.getuser();
                 dbComptable.Loggable.UserPwd = paramCpta.getpwd();
 
                 dbComptable.Open();
-                Console.WriteLine("succes connexion à " + paramCpta.getDbname());
+                Console.WriteLine("succes connexion à " + paramCpta.getDbPath());
                 return true;
             }
             catch (Exception e)
@@ -68,12 +72,12 @@ namespace Test.Classes
             try
             {
                 //ouverture de la base comptable 
-                dbCommercial.Name = paramCial.getDbname();
+                dbCommercial.Name = paramCial.getDbPath();
                 dbCommercial.Loggable.UserName = paramCial.getuser();
                 dbCommercial.Loggable.UserPwd = paramCial.getpwd();
                 dbCommercial.CptaApplication = bdcompta;
                 dbCommercial.Open();
-                Console.WriteLine("succes connexion à " + paramCial.getDbname());
+                Console.WriteLine("succes connexion à " + paramCial.getDbPath());
                 return true;
             }
             catch (Exception e)
@@ -143,10 +147,20 @@ namespace Test.Classes
                     entete.SetDefaultClient(dbCompta.FactoryClient.ReadNumero(jsonObject.codeClient));
                     entete.DO_Date = StringToDate(jsonObject.dateCommande, "yyyyMMddHHmmss"); // méthode de conversion
                     entete.DO_DateLivr = StringToDate(jsonObject.dateLivraison, "yyyyMMddHHmmss");
-                    Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                   
                     //TODO vérifier que la souche existe avant insertion
-                    //attibuer la souche de type PDA
-                    entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule("PDA");
+                    String nomsouche = getSouche(jsonObject.codeTerminal, getTabCorrespondance(dbname));
+                    Console.WriteLine("nom de la souche: " + nomsouche);
+                    if (dbCommerce.FactorySoucheVente.ExistIntitule(nomsouche)){
+
+                        Objets100cLib.IBPSoucheVente souche = (Objets100cLib.IBPSoucheVente)dbCommerce.FactorySoucheVente.Create();
+                        //attibuer la souche 
+                        entete.Souche = (Objets100cLib.IBISouche)dbCommerce.FactorySoucheVente.ReadIntitule(nomsouche);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"La souche {nomsouche} ne correspond à auncune souche dans SAGE! Base actuelle: {dbname}");
+                    }
                     //Affecte le prochain numéro de pièce en fonction de la souche (chrono)
                     entete.SetDefaultDO_Piece();
                     entete.DO_Ref = jsonObject.codeTerminal + jsonObject.idEntete;
@@ -270,17 +284,44 @@ namespace Test.Classes
 
                 for(int j =0; j< tabCorrespondance.GetLength(1); j++)
                 {
-                    Console.WriteLine("i: " + i + "j: "+ j + " "+ tabCorrespondance[i,j]);
+                   // Console.WriteLine("i: " + i + "j: "+ j + " "+ tabCorrespondance[i,j]);
                     if(codeTerminal == tabCorrespondance[i, j])
                     {
-                        Console.WriteLine(codeTerminal + "trouvé a la position: " + i + j);
-                        Console.WriteLine(codeTerminal + "respond donc à la souche" + tabCorrespondance[i, 0]);
                         //les souches  sont a l'index 0 de chaque tableau
-                        souche = tabCorrespondance[i, 0];                   
+                        souche = tabCorrespondance[i, 0];
+                        //Console.WriteLine(codeTerminal + "trouvé a la position: " + i + j);
+                        //Console.WriteLine(codeTerminal + "respond donc à la souche" + tabCorrespondance[i, 0]);
                     }
                 }
             }
             return souche;
         }
+        /**
+         * 
+         */
+        string[,] getTabCorrespondance(String dbname)
+        {
+            switch (dbname)
+            {
+                case "STOCKSERVICE":
+                    Console.WriteLine("base STOCKSERVICE");
+                    return souchesStockservice;
+                    break;
+                case "DISBEP":
+                    Console.WriteLine("base DISBEP");
+                    return souchesStockservice;
+                    break;
+                case "REDISMA":
+                    Console.WriteLine("base REDISMA");
+                    return souchesRedisma;
+                    break;
+                default:
+                    Console.WriteLine("Nom de fichier non reconnu.");
+                    return null;
+                    break;
+            }
+
+        }
+
     }
 }
